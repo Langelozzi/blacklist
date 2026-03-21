@@ -1,6 +1,7 @@
 import platform
 import argparse
 import os
+import shutil
 
 DEFAULT_BLOCKLIST = "blocklist.txt"
 DEFAULT_REDIRECT_IP = "127.0.0.1"  # Loopback
@@ -10,6 +11,15 @@ UNIX_HOST_FILE = "/etc/hosts"
 
 
 def is_running_as_root():
+    # Windows check: try to open the hosts file in append mode
+    if platform.system() == "Windows":
+        try:
+            with open(WINDOWS_HOST_FILE, "a"):
+                pass
+            return True
+        except PermissionError:
+            return False
+    # Unix/Linux/Mac check
     return os.geteuid() == 0
 
 
@@ -23,6 +33,21 @@ def get_hosts_path():
         return WINDOWS_HOST_FILE
     else:
         return UNIX_HOST_FILE
+
+
+def backup_hosts_file():
+    hosts_path = get_hosts_path()
+    backup_path = f"{hosts_path}.backup"
+
+    if not os.path.exists(backup_path):
+        try:
+            shutil.copy2(hosts_path, backup_path)
+            print(f"[+] Initial backup created at: {backup_path}")
+        except Exception as e:
+            print(f"[-] Failed to create backup: {e}")
+    else:
+        # We don't overwrite it because we want to keep the "original" clean state
+        pass
 
 
 def read_blocklist_set(filename):
@@ -87,6 +112,7 @@ def get_blocklist(blocklist_filename):
 def block_sites(blocklist_filename, redirect_ip):
     hosts_path = get_hosts_path()
     blocklist = get_blocklist(blocklist_filename)
+    backup_hosts_file()
     write_blocklist(hosts_path, blocklist, redirect_ip)
     print(f"[+] Successfully blocked domains from '{blocklist_filename}'")
 
@@ -94,6 +120,7 @@ def block_sites(blocklist_filename, redirect_ip):
 def unblock_sites(blocklist_filename):
     hosts_path = get_hosts_path()
     blocklist = get_blocklist(blocklist_filename)
+    backup_hosts_file()
     remove_blocklist(hosts_path, blocklist)
     print(
         f"[+] Successfully removed domains from '{blocklist_filename}' from the hosts file."
