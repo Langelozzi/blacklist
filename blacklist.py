@@ -2,6 +2,9 @@ import platform
 import argparse
 import os
 import shutil
+import sys
+
+from modules.password import remove_password, set_password, verify_password
 
 DEFAULT_BLOCKLIST = "blocklist.txt"
 DEFAULT_REDIRECT_IP = "127.0.0.1"  # Loopback
@@ -77,7 +80,7 @@ def get_processed_blocklist(blocklist_set):
 def write_blocklist(hosts_path, blocklist, redirect_ip):
     with open(hosts_path, "r+") as file:
         content = file.read()
-        print(" >  Blocking domains...")
+        print("[>] Blocking sites...")
         for website in blocklist:
             if website not in content:
                 file.seek(0, 2)
@@ -85,7 +88,7 @@ def write_blocklist(hosts_path, blocklist, redirect_ip):
 
 
 def remove_blocklist(hosts_path, blocklist):
-    print(" >  Removing blocked domains from hosts file...")
+    print("[>] Removing blocked sites...")
 
     with open(hosts_path, "r") as file:
         lines = file.readlines()
@@ -114,7 +117,7 @@ def block_sites(blocklist_filename, redirect_ip):
     blocklist = get_blocklist(blocklist_filename)
     backup_hosts_file()
     write_blocklist(hosts_path, blocklist, redirect_ip)
-    print(f"[+] Successfully blocked domains from '{blocklist_filename}'")
+    print(f"[+] Successfully blocked sites from '{blocklist_filename}'")
 
 
 def unblock_sites(blocklist_filename):
@@ -122,9 +125,7 @@ def unblock_sites(blocklist_filename):
     blocklist = get_blocklist(blocklist_filename)
     backup_hosts_file()
     remove_blocklist(hosts_path, blocklist)
-    print(
-        f"[+] Successfully removed domains from '{blocklist_filename}' from the hosts file."
-    )
+    print(f"[+] Successfully unblocked sites from '{blocklist_filename}'.")
 
 
 def parse_args():
@@ -154,14 +155,34 @@ def parse_args():
         help=f"The redirect IP address (default: {DEFAULT_REDIRECT_IP})",
     )
 
+    parser.add_argument(
+        "--set-password", action="store_true", help="Initialize/Change password"
+    )
+
+    parser.add_argument(
+        "--remove-password", action="store_true", help="Remove the password completely"
+    )
+
     return parser.parse_args()
 
 
 def main():
     args = parse_args()
 
+    if args.set_password:
+        set_password()
+        return
+
+    if args.remove_password:
+        remove_password()
+        return
+
     try:
         assert_root_user()
+
+        if not verify_password():
+            return
+
         if args.revert:
             unblock_sites(args.file)
         else:
@@ -171,4 +192,11 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("\n[i] Operation cancelled by user. Exiting...")
+        try:
+            sys.exit(0)
+        except SystemExit:
+            os._exit(0)
