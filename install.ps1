@@ -5,7 +5,7 @@ $ListPath = "$ConfigDir\blocklist.txt"
 
 # URLs
 $BinaryUrl = "https://github.com/Langelozzi/blacklist/releases/download/v0.1.0/blacklist-windows.exe"
-$ListUrl = "https://raw.githubusercontent.com/Langelozzi/blacklist/main/blocklist.txt"
+$ListUrl = "https://raw.githubusercontent.com/Langelozzi/blacklist/main/lists/blocklist.txt"
 
 # 2. Create Folder
 if (!(Test-Path $ConfigDir)) {

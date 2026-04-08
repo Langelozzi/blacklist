@@ -17,7 +17,7 @@ chmod +x "$INSTALL_SRC/blacklist-bin"
 
 # 4. Download Blocklist to Config Folder
 echo "[+] Downloading blocklist to $CONFIG_DIR..."
-curl -L -o "$CONFIG_DIR/blocklist.txt" "https://raw.githubusercontent.com/Langelozzi/blacklist/main/blocklist.txt"
+curl -L -o "$CONFIG_DIR/blocklist.txt" "https://raw.githubusercontent.com/Langelozzi/blacklist/main/lists/blocklist.txt"
 
 # 5. Create the Symlink (Requires Sudo for /usr/local/bin)
 echo "[+] Creating symlink..."
