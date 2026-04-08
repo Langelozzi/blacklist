@@ -6,7 +6,7 @@ import sys
 
 from modules.password import remove_password, set_password, verify_password
 
-DEFAULT_BLOCKLIST = "blocklist.txt"
+DEFAULT_BLOCKLIST = "lists/blocklist.txt"
 DEFAULT_REDIRECT_IP = "127.0.0.1"  # Loopback
 
 WINDOWS_HOST_FILE = r"C:\Windows\System32\drivers\etc\hosts"
