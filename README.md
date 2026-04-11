@@ -8,12 +8,12 @@ A simple CLI tool to block and unblock websites by modifying your system's `host
 
 **macOS / Linux**
 ```bash
-curl -fsSL https://raw.githubusercontent.com/your-username/blacklist/main/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/Langelozzi/blacklist/main/install.sh | sudo bash
 ```
 
 **Windows (PowerShell — run as Administrator)**
 ```powershell
-irm https://raw.githubusercontent.com/your-username/blacklist/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/Langelozzi/blacklist/main/install.ps1 | iex
 ```
 
 > **Note:** The tool requires root/Administrator privileges to modify the hosts file.
