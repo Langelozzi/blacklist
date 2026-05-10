@@ -4,7 +4,7 @@ import os
 import shutil
 import sys
 
-from modules.password import remove_password, set_password, verify_password
+from cli.modules.password import remove_password, set_password, verify_password
 
 DEFAULT_BLOCKLIST = "lists/blocklist.txt"
 DEFAULT_REDIRECT_IP = "127.0.0.1"  # Loopback

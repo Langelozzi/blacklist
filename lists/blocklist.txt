@@ -1,6 +1,7 @@
 hardporno.tube
 abxxx.com
 xecce.com
+pornwex.tv
 sexylezzy.com
 rock.porn
 lustysextube.com
@@ -433,6 +434,56 @@ bigfuck.tv
 dxlive.com
 manhunt.net
 zbiornik.com
+ukdevilz.com
+epawg.com
+streamporn.li
+allnporn.com
+thothub.to
+jodiwest.com
+queercrush.com
+fullporner.com
+ru.katestube.com
+pt.katestube.com
+ja.katestube.com
+nl.katestube.com
+se.katestube.com
+pl.katestube.com
+dk.katestube.com
+es.hatestube.com
+it.katestube.com
+de.katestube.com
+topvid.tv
+sxypix.com
+namethatpornad.com
+jkforum.net
+porntasia.app
+updatesz.com
+elliemurphyxxx.com
+tryfist.net
+fr.pornforfans.com
+truelesbian.com
+us.dvderotik.com
+thepornbuzz.com
+hush-hush.co.uk
+xujan.com
+it.perfektdamen.co
+fr.perfektdamen.co
+allgirlmassage.com
+lezbebad.com
+girlfriendsfilmsnews.com
+severeporn.com
+tukif.porn
+hoes.tube
+max.porn
+fapcat.com
+zh.fapcat.com
+pornfap.org
+wow.xxx
+ductporn.com
+theyarehuge.com
+analgalore.com
+tubebdsm.com
+yesporn.vip
 porn4days.net
 lobstertube.com
 josporn.net
@@ -15797,7 +15848,7 @@ dodef merge_files_strict_clean(file1_path, file2_path, output_path):
                     # 1. Split by '#' and take the first part (everything before the comment)
                     # 2. Strip whitespace from that remaining part
                     clean_line = line.split('#')[0].strip()
-                    
+
                     # Only add if the line isn't empty after stripping
                     if clean_line:
                         unique_lines.add(clean_line)
@@ -15814,7 +15865,7 @@ dodef merge_files_strict_clean(file1_path, file2_path, output_path):
         with open(output_path, 'w') as out_file:
             for item in sorted(combined_unique):
                 out_file.write(f"{item}\n")
-        
+
         print(f"Success! Exported {len(combined_unique)} unique, comment-free lines.")
 
     except FileNotFoundError as e:
@@ -15976,7 +16027,7 @@ dt.adsafeprotected.comdef merge_files_strict_clean(file1_path, file2_path, outpu
                     # 1. Split by '#' and take the first part (everything before the comment)
                     # 2. Strip whitespace from that remaining part
                     clean_line = line.split('#')[0].strip()
-                    
+
                     # Only add if the line isn't empty after stripping
                     if clean_line:
                         unique_lines.add(clean_line)
@@ -15993,7 +16044,7 @@ dt.adsafeprotected.comdef merge_files_strict_clean(file1_path, file2_path, outpu
         with open(output_path, 'w') as out_file:
             for item in sorted(combined_unique):
                 out_file.write(f"{item}\n")
-        
+
         print(f"Success! Exported {len(combined_unique)} unique, comment-free lines.")
 
     except FileNotFoundError as e:

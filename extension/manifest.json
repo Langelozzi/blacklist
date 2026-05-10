@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "Advanced Guard (AI Powered)",
+  "version": "0.3.0",
+  "permissions": ["storage", "declarativeNetRequest"],
+  "host_permissions": ["<all_urls>"],
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["lib/tf.min.js", "lib/nsfwjs.min.js", "content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

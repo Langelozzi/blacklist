@@ -41,7 +41,7 @@ jobs:
 
       - name: Build with PyInstaller
         run: |
-          pyinstaller --onefile --name blacklist blacklist.py
+          pyinstaller --onefile --name blacklist cli/blacklist.py
 
       - name: Rename binary (Unix)
         if: matrix.os != 'windows-latest'

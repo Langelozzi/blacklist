@@ -2,6 +2,8 @@
 
 A simple CLI tool to block and unblock websites by modifying your system's `hosts` file. Supports optional password protection to prevent unauthorized changes.
 
+The Python CLI lives in `cli/`, and the Chrome extension scaffold lives in `extension/`.
+
 ---
 
 ## Installation
