@@ -5,7 +5,7 @@ BIN_NAME="blacklist"
 SYMLINK_PATH="/usr/local/bin/$BIN_NAME"
 REPO="Langelozzi/blacklist"
 
-# Logic to match your YAML asset_name
+# 1. Logic to match your YAML asset_name
 OS_TYPE=$(uname -s | tr '[:upper:]' '[:lower:]')
 if [ "$OS_TYPE" == "darwin" ]; then
     SEARCH_PATTERN="blacklist-macos"
@@ -22,11 +22,26 @@ if [ -z "$DOWNLOAD_URL" ]; then
     exit 1
 fi
 
+# 2. Ensure directory exists
 mkdir -p "$INSTALL_DIR"
-curl -L -o "$INSTALL_DIR/$BIN_NAME" "$DOWNLOAD_URL"
-chmod +x "$INSTALL_DIR/$BIN_NAME"
 
-if [ -L "$SYMLINK_PATH" ] || [ -f "$SYMLINK_PATH" ]; then sudo rm "$SYMLINK_PATH"; fi
+# 3. Download to a temporary file (Atomic Swap)
+# This prevents "Text file busy" errors when updating while running.
+echo "[+] Downloading latest binary..."
+TEMP_BIN="$INSTALL_DIR/${BIN_NAME}.tmp"
+
+curl -L -o "$TEMP_BIN" "$DOWNLOAD_URL"
+chmod +x "$TEMP_BIN"
+
+# Use 'mv' to overwrite the old binary.
+# Linux/macOS allows this even if the old binary is currently executing.
+mv -f "$TEMP_BIN" "$INSTALL_DIR/$BIN_NAME"
+
+# 4. Manage Symlink
+echo "[+] Updating symlink at $SYMLINK_PATH..."
+if [ -L "$SYMLINK_PATH" ] || [ -f "$SYMLINK_PATH" ]; then
+    sudo rm "$SYMLINK_PATH"
+fi
 sudo ln -s "$INSTALL_DIR/$BIN_NAME" "$SYMLINK_PATH"
 
-echo -e "\n[!] Done! Type 'sudo blacklist on' to begin."
+echo -e "\n[!] Success! Type 'sudo blacklist on' to begin."
