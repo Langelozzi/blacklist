@@ -22,9 +22,23 @@ if (!(Test-Path $ConfigDir)) {
     New-Item -ItemType Directory -Path $ConfigDir | Out-Null
 }
 
-# 4. Download Binary
+# 4. Download Binary with Lock Handling for Self-Updates
 Write-Host "[+] Downloading latest version from: $DownloadUrl" -ForegroundColor Cyan
-Invoke-WebRequest -Uri $DownloadUrl -OutFile $BinaryPath
+
+if (Test-Path $BinaryPath) {
+    try {
+        Invoke-WebRequest -Uri $DownloadUrl -OutFile $BinaryPath -ErrorAction Stop
+    } catch {
+        Write-Host "[i] File is in use. Performing hot-swap..." -ForegroundColor Yellow
+        $OldFile = "$BinaryPath.old"
+        if (Test-Path $OldFile) { Remove-Item $OldFile -Force }
+
+        Move-Item -Path $BinaryPath -Destination $OldFile -Force
+        Invoke-WebRequest -Uri $DownloadUrl -OutFile $BinaryPath
+    }
+} else {
+    Invoke-WebRequest -Uri $DownloadUrl -OutFile $BinaryPath
+}
 
 # 5. Add to PATH
 $UserPath = [Environment]::GetEnvironmentVariable("Path", "User")
