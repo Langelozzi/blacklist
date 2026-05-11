@@ -31,17 +31,17 @@ def assert_root_user():
 
 def run_system_command(command, **kwargs):
     """
-    Runs a command while ensuring PyInstaller's bundled libraries 
-    don't interfere with system utilities. Accepts any standard 
+    Runs a command while ensuring PyInstaller's bundled libraries
+    don't interfere with system utilities. Accepts any standard
     subprocess.run arguments.
     """
     env = os.environ.copy()
     # Remove PyInstaller's library path to use system-native libraries
     env.pop("LD_LIBRARY_PATH", None)
-    
+
     # Ensure 'env' is included in the final call
-    kwargs['env'] = env
-    
+    kwargs["env"] = env
+
     # Use the real subprocess module, not the function name itself
     return subprocess.run(command, **kwargs)
 
@@ -53,7 +53,7 @@ def update_tool():
 
     try:
         if system == "Windows":
-            cmd = "powershell -Command \"irm https://raw.githubusercontent.com/Langelozzi/blacklist/main/install.ps1 | iex\""
+            cmd = 'powershell -Command "irm https://raw.githubusercontent.com/Langelozzi/blacklist/main/install.ps1 | iex"'
             # Note: shell=True is important here for Windows to parse the command string correctly
             run_system_command(cmd, shell=True)
 
@@ -115,12 +115,12 @@ def turn_on():
             run_system_command(
                 f'netsh interface ipv4 set dns name="{iface}" source=static addr={IPV4_DNS[0]} primary',
                 shell=True,
-                capture_output=True
+                capture_output=True,
             )
             run_system_command(
                 f'netsh interface ipv4 add dns name="{iface}" addr={IPV4_DNS[1]} index=2',
                 shell=True,
-                capture_output=True
+                capture_output=True,
             )
             run_system_command(
                 f'netsh interface ipv6 set dns name="{iface}" source=static addr={IPV6_DNS[0]}',
@@ -208,11 +208,7 @@ def turn_off():
     print("\n[+] Content filter status: OFF")
 
 
-def parse_args():
-    parser = argparse.ArgumentParser(
-        description="Blacklist: A CLI tool that allows enabling and disabling adult content filters with a single command."
-    )
-
+def parse_args(parser):
     parser.add_argument(
         "state",
         nargs="?",
@@ -237,7 +233,10 @@ def parse_args():
 
 
 def main():
-    args = parse_args()
+    parser = argparse.ArgumentParser(
+        description="Blacklist: A CLI tool that allows enabling and disabling adult content filters with a single command."
+    )
+    args = parse_args(parser)
 
     if args.set_password:
         set_password()
@@ -252,8 +251,7 @@ def main():
         return
 
     if args.state is None:
-        print("[-] Error: Please specify a state ('on' or 'off') or a password command.")
-        print("    Usage: blacklist {on,off} | --set-password | --remove-password")
+        parser.print_help()
         return
 
     try:
@@ -269,6 +267,7 @@ def main():
 
     except PermissionError:
         print("[-] Error: Insufficient permissions. Run as Admin/Sudo.")
+        parser.print_help()
 
 
 if __name__ == "__main__":
