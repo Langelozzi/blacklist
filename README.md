@@ -46,5 +46,5 @@ blacklist --remove-password
 
 **Update blacklist:**
 ```bash
-blacklist --update
+sudo blacklist --update
 ```
