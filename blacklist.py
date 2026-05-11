@@ -76,12 +76,14 @@ def turn_on():
         for iface in ifaces:
             print(f"  [i] Securing interface: {iface}")
             subprocess.run(
-                f'netsh interface ipv4 set dns name="{iface}" source=static addr={IPV4_DNS[0]}',
+                f'netsh interface ipv4 set dns name="{iface}" source=static addr={IPV4_DNS[0]} primary',
                 shell=True,
+                capture_output=True
             )
             subprocess.run(
                 f'netsh interface ipv4 add dns name="{iface}" addr={IPV4_DNS[1]} index=2',
                 shell=True,
+                capture_output=True
             )
             subprocess.run(
                 f'netsh interface ipv6 set dns name="{iface}" source=static addr={IPV6_DNS[0]}',
@@ -176,7 +178,9 @@ def parse_args():
 
     parser.add_argument(
         "state",
+        nargs="?",
         choices=["on", "off"],
+        default=None,
         help="Turn the blacklist 'on' (enable) or 'off' (disable/revert)",
     )
 
@@ -202,6 +206,11 @@ def main():
         remove_password()
         return
 
+    if args.state is None:
+        print("[-] Error: Please specify a state ('on' or 'off') or a password command.")
+        print("    Usage: blacklist {on,off} | --set-password | --remove-password")
+        return
+
     try:
         assert_root_user()
 
@@ -212,8 +221,7 @@ def main():
             turn_on()
         elif args.state == "off":
             turn_off()
-        else:
-            print(f"[-] Error: Invalid option {args.state}")
+
     except PermissionError:
         print("[-] Error: Insufficient permissions. Run as Admin/Sudo.")
 
