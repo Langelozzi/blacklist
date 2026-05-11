@@ -46,6 +46,26 @@ def run_system_command(command, **kwargs):
     return subprocess.run(command, **kwargs)
 
 
+def update_tool():
+    """Executes the remote install script based on the current OS."""
+    system = platform.system()
+    print(f"\n[+] Initiating update for {system}...")
+
+    try:
+        if system == "Windows":
+            cmd = "powershell -Command \"irm https://raw.githubusercontent.com/Langelozzi/blacklist/main/install.ps1 | iex\""
+            # Note: shell=True is important here for Windows to parse the command string correctly
+            run_system_command(cmd, shell=True)
+
+        elif system in ["Darwin", "Linux"]:
+            cmd = "curl -fsSL https://raw.githubusercontent.com/Langelozzi/blacklist/main/install.sh | sudo bash"
+            run_system_command(cmd, shell=True)
+
+        print("\n[+] Update process completed.")
+    except Exception as e:
+        print(f"\n[-] Update failed: {e}")
+
+
 def get_all_interfaces():
     """Identifies all relevant hardware interfaces for the current OS."""
     system = platform.system()
@@ -209,6 +229,10 @@ def parse_args():
         "--remove-password", action="store_true", help="Remove the password completely"
     )
 
+    parser.add_argument(
+        "--update", action="store_true", help="Update the tool to the latest version"
+    )
+
     return parser.parse_args()
 
 
@@ -221,6 +245,10 @@ def main():
 
     if args.remove_password:
         remove_password()
+        return
+
+    if args.update:
+        update_tool()
         return
 
     if args.state is None:
