@@ -210,7 +210,7 @@ def turn_off():
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Blacklist: A simple CLI to block/unblock websites via the hosts file."
+        description="Blacklist: A CLI tool that allows enabling and disabling adult content filters with a single command."
     )
 
     parser.add_argument(
