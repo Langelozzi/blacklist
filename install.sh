@@ -1,29 +1,29 @@
 #!/bin/bash
 
 # 1. Define Paths
-INSTALL_SRC="$HOME/.config/blacklist"
-BIN_LINK="/usr/local/bin/blacklist"
-CONFIG_DIR="$HOME/.config/blacklist"
+INSTALL_DIR="$HOME/.local/share/blacklist"
+BIN_NAME="blacklist"
+SYMLINK_PATH="/usr/local/bin/$BIN_NAME"
 
-# 2. Create Folders
-mkdir -p "$INSTALL_SRC"
-mkdir -p "$CONFIG_DIR"
+# Detect OS for correct binary
+OS_TYPE=$(uname -s | tr '[:upper:]' '[:lower:]')
+BINARY_URL="https://github.com/Langelozzi/blacklist/releases/download/v0.1.0/blacklist-$OS_TYPE"
 
-# 3. Download Binary (Assume we are testing locally or repo is public)
-# Replace with your actual curl command
-echo "[+] Downloading binary to $INSTALL_SRC..."
-curl -L -o "$INSTALL_SRC/blacklist-bin" "https://github.com/Langelozzi/blacklist/releases/download/v0.1.0/blacklist-linux"
-chmod +x "$INSTALL_SRC/blacklist-bin"
+# 2. Create Installation Directory
+mkdir -p "$INSTALL_DIR"
 
-# 4. Download Blocklist to Config Folder
-echo "[+] Downloading blocklist to $CONFIG_DIR..."
-curl -L -o "$CONFIG_DIR/blocklist.txt" "https://raw.githubusercontent.com/Langelozzi/blacklist/main/lists/blocklist.txt"
+# 3. Download Binary
+echo "[+] Downloading $OS_TYPE binary to $INSTALL_DIR..."
+curl -L -o "$INSTALL_DIR/$BIN_NAME" "$BINARY_URL"
+chmod +x "$INSTALL_DIR/$BIN_NAME"
 
-# 5. Create the Symlink (Requires Sudo for /usr/local/bin)
-echo "[+] Creating symlink..."
-if [ -L "$BIN_LINK" ]; then
-    sudo rm "$BIN_LINK"
+# 4. Create the Symlink (Requires Sudo for /usr/local/bin)
+echo "[+] Creating symlink at $SYMLINK_PATH..."
+if [ -L "$SYMLINK_PATH" ] || [ -f "$SYMLINK_PATH" ]; then
+    sudo rm "$SYMLINK_PATH"
 fi
-sudo ln -s "$INSTALL_SRC/blacklist-bin" "$BIN_LINK"
 
-echo "[!] Done! Running 'blacklist' will now trigger the binary at $INSTALL_SRC."
+sudo ln -s "$INSTALL_DIR/$BIN_NAME" "$SYMLINK_PATH"
+
+echo -e "\n[!] Done! Type 'blacklist on' or 'blacklist off' to manage the filter."
+echo "[i] Note: You will be prompted for your sudo password to change network settings."

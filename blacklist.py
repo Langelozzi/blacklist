@@ -1,29 +1,27 @@
-import platform
-import argparse
 import os
-import shutil
 import sys
+import platform
+import subprocess
+import argparse
+import ctypes
+from pathlib import Path
 
 from modules.password import remove_password, set_password, verify_password
 
-DEFAULT_BLOCKLIST = "lists/blocklist.txt"
-DEFAULT_REDIRECT_IP = "127.0.0.1"  # Loopback
-
-WINDOWS_HOST_FILE = r"C:\Windows\System32\drivers\etc\hosts"
-UNIX_HOST_FILE = "/etc/hosts"
+# Cloudflare for Families (Malware + Adult Content Filter)
+IPV4_DNS = ["1.1.1.3", "1.0.0.3"]
+IPV6_DNS = ["2606:4700:4700::1113", "2606:4700:4700::1003"]
 
 
 def is_running_as_root():
-    # Windows check: try to open the hosts file in append mode
-    if platform.system() == "Windows":
-        try:
-            with open(WINDOWS_HOST_FILE, "a"):
-                pass
-            return True
-        except PermissionError:
-            return False
-    # Unix/Linux/Mac check
-    return os.geteuid() == 0
+    try:
+        return (
+            os.getuid() == 0
+            if platform.system() != "Windows"
+            else ctypes.windll.shell32.IsUserAnAdmin()
+        )
+    except AttributeError:
+        return False
 
 
 def assert_root_user():
@@ -31,101 +29,144 @@ def assert_root_user():
         raise PermissionError
 
 
-def get_hosts_path():
-    if platform.system() == "Windows":
-        return WINDOWS_HOST_FILE
-    else:
-        return UNIX_HOST_FILE
+def get_all_interfaces():
+    """Identifies all relevant hardware interfaces for the current OS."""
+    system = platform.system()
+    interfaces = []
 
+    if system == "Windows":
+        # Get all enabled interfaces that aren't loopback
+        cmd = "netsh interface show interface"
+        output = subprocess.check_output(cmd, shell=True).decode()
+        for line in output.splitlines():
+            if "Dedicated" in line:
+                # Extracts interface name which starts at index 44 in netsh output
+                name = line[44:].strip()
+                interfaces.append(name)
 
-def backup_hosts_file():
-    hosts_path = get_hosts_path()
-    backup_path = f"{hosts_path}.backup"
+    elif system == "Darwin":  # macOS
+        cmd = "networksetup -listallnetworkservices"
+        output = subprocess.check_output(cmd, shell=True).decode()
+        # Filter out asterisks (disabled services) and empty lines
+        interfaces = [
+            line.strip()
+            for line in output.splitlines()
+            if line.strip() and "*" not in line and "Network Services" not in line
+        ]
 
-    if not os.path.exists(backup_path):
+    elif system == "Linux":
+        # For Linux, we return the active ones for nmcli to modify profiles,
+        # but the global config change handles the rest.
         try:
-            shutil.copy2(hosts_path, backup_path)
-            print(f"[+] Initial backup created at: {backup_path}")
+            cmd = "nmcli -t -f NAME connection show"
+            output = subprocess.check_output(cmd, shell=True).decode()
+            interfaces = [line.strip() for line in output.splitlines() if line.strip()]
+        except:
+            pass
+
+    return interfaces
+
+
+def turn_on():
+    system = platform.system()
+    ifaces = get_all_interfaces()
+    print("\n[+] Enabling content filter...\n")
+
+    if system == "Windows":
+        for iface in ifaces:
+            print(f"  [i] Securing interface: {iface}")
+            subprocess.run(
+                f'netsh interface ipv4 set dns name="{iface}" source=static addr={IPV4_DNS[0]}',
+                shell=True,
+            )
+            subprocess.run(
+                f'netsh interface ipv4 add dns name="{iface}" addr={IPV4_DNS[1]} index=2',
+                shell=True,
+            )
+            subprocess.run(
+                f'netsh interface ipv6 set dns name="{iface}" source=static addr={IPV6_DNS[0]}',
+                shell=True,
+            )
+            subprocess.run(
+                f'netsh interface ipv6 add dns name="{iface}" addr={IPV6_DNS[1]} index=2',
+                shell=True,
+            )
+        subprocess.run("ipconfig /flushdns", shell=True)
+
+    elif system == "Darwin":
+        dns_str = " ".join(IPV4_DNS + IPV6_DNS)
+        for iface in ifaces:
+            print(f"  [i] Securing interface: {iface}")
+            subprocess.run(
+                f'sudo networksetup -setdnsservers "{iface}" {dns_str}', shell=True
+            )
+        subprocess.run("sudo killall -HUP mDNSResponder", shell=True)
+
+    elif system == "Linux":
+        # 1. Update all existing connection profiles
+        dns_v4 = ",".join(IPV4_DNS)
+        dns_v6 = ",".join(IPV6_DNS)
+        for iface in ifaces:
+            subprocess.run(
+                f'nmcli connection modify "{iface}" ipv4.dns "{dns_v4}" ipv4.ignore-auto-dns yes',
+                shell=True,
+            )
+            subprocess.run(
+                f'nmcli connection modify "{iface}" ipv6.dns "{dns_v6}" ipv6.ignore-auto-dns yes',
+                shell=True,
+            )
+
+        # 2. Global override for NEW connections
+        config_path = Path("/etc/NetworkManager/conf.d/dns-override.conf")
+        content = "[main]\ndns=none\n"
+        try:
+            with open(config_path, "w") as f:
+                f.write(content)
+            subprocess.run("systemctl restart NetworkManager", shell=True)
         except Exception as e:
-            print(f"[-] Failed to create backup: {e}")
-    else:
-        # We don't overwrite it because we want to keep the "original" clean state
-        pass
+            print(f"[!] Could not write global config: {e}")
+
+    print("\n[+] Content filter status: ON")
 
 
-def read_blocklist_set(filename):
-    if not os.path.exists(filename):
-        print(f"[-] Error: File '{filename}' not found.")
-        return
+def turn_off():
+    system = platform.system()
+    ifaces = get_all_interfaces()
+    print("\n[+] Disabling content filter...")
 
-    with open(filename, "r") as f:
-        websites = {line.strip() for line in f if line.strip()}
-        return websites
+    if system == "Windows":
+        for iface in ifaces:
+            subprocess.run(
+                f'netsh interface ipv4 set dns name="{iface}" source=dhcp', shell=True
+            )
+            subprocess.run(
+                f'netsh interface ipv6 set dns name="{iface}" source=dhcp', shell=True
+            )
 
+    elif system == "Darwin":
+        for iface in ifaces:
+            subprocess.run(
+                f'sudo networksetup -setdnsservers "{iface}" empty', shell=True
+            )
 
-def get_processed_blocklist(blocklist_set):
-    # Add www. version if it doesn't exist in the set yet
-    processed_set = set()
-    for site in blocklist_set:
-        processed_set.add(site)
+    elif system == "Linux":
+        # 1. Revert profiles
+        for iface in ifaces:
+            subprocess.run(
+                f'nmcli connection modify "{iface}" ipv4.ignore-auto-dns no ipv6.ignore-auto-dns no',
+                shell=True,
+            )
+            subprocess.run(
+                f'nmcli connection modify "{iface}" ipv4.dns "" ipv6.dns ""', shell=True
+            )
 
-        has_www_already = site[:4] == "www."
-        www_version = f"www.{site}"
-        if not has_www_already and www_version not in blocklist_set:
-            processed_set.add(www_version)
+        # 2. Remove global override
+        config_path = Path("/etc/NetworkManager/conf.d/dns-override.conf")
+        if config_path.exists():
+            config_path.unlink()
+            subprocess.run("systemctl restart NetworkManager", shell=True)
 
-    return processed_set
-
-
-def write_blocklist(hosts_path, blocklist, redirect_ip):
-    with open(hosts_path, "r+") as file:
-        content = file.read()
-        print("[>] Blocking sites...")
-        for website in blocklist:
-            if website not in content:
-                file.seek(0, 2)
-                file.write(f"{redirect_ip} {website}\n")
-
-
-def remove_blocklist(hosts_path, blocklist):
-    print("[>] Removing blocked sites...")
-
-    with open(hosts_path, "r") as file:
-        lines = file.readlines()
-
-    # Keep lines that aren't in our removal set
-    new_content = [
-        line for line in lines if not any(site in line for site in blocklist)
-    ]
-
-    with open(hosts_path, "w") as file:
-        file.writelines(new_content)
-
-
-def get_blocklist(blocklist_filename):
-    try:
-        blocklist_set = read_blocklist_set(blocklist_filename)
-    except PermissionError:
-        print("[-] Error: Could not read the blocklist file.")
-        return
-
-    return get_processed_blocklist(blocklist_set)
-
-
-def block_sites(blocklist_filename, redirect_ip):
-    hosts_path = get_hosts_path()
-    blocklist = get_blocklist(blocklist_filename)
-    backup_hosts_file()
-    write_blocklist(hosts_path, blocklist, redirect_ip)
-    print(f"[+] Successfully blocked sites from '{blocklist_filename}'")
-
-
-def unblock_sites(blocklist_filename):
-    hosts_path = get_hosts_path()
-    blocklist = get_blocklist(blocklist_filename)
-    backup_hosts_file()
-    remove_blocklist(hosts_path, blocklist)
-    print(f"[+] Successfully unblocked sites from '{blocklist_filename}'.")
+    print("\n[+] Content filter status: OFF")
 
 
 def parse_args():
@@ -133,26 +174,10 @@ def parse_args():
         description="Blacklist: A simple CLI to block/unblock websites via the hosts file."
     )
 
-    # 'nargs="?"' makes it optional; 'default' provides the fallback
     parser.add_argument(
-        "file",
-        nargs="?",
-        default=DEFAULT_BLOCKLIST,
-        help=f"Path to the .txt file (default: {DEFAULT_BLOCKLIST})",
-    )
-
-    parser.add_argument(
-        "-r",
-        "--revert",
-        action="store_true",
-        help="Unblock the domains listed in the file",
-    )
-
-    parser.add_argument(
-        "-i",
-        "--ip-address",
-        default=DEFAULT_REDIRECT_IP,
-        help=f"The redirect IP address (default: {DEFAULT_REDIRECT_IP})",
+        "state",
+        choices=["on", "off"],
+        help="Turn the blacklist 'on' (enable) or 'off' (disable/revert)",
     )
 
     parser.add_argument(
@@ -183,10 +208,12 @@ def main():
         if not verify_password():
             return
 
-        if args.revert:
-            unblock_sites(args.file)
+        if args.state == "on":
+            turn_on()
+        elif args.state == "off":
+            turn_off()
         else:
-            block_sites(args.file, args.ip_address)
+            print(f"[-] Error: Invalid option {args.state}")
     except PermissionError:
         print("[-] Error: Insufficient permissions. Run as Admin/Sudo.")
 
