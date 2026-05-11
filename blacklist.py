@@ -29,6 +29,23 @@ def assert_root_user():
         raise PermissionError
 
 
+def run_system_command(command, **kwargs):
+    """
+    Runs a command while ensuring PyInstaller's bundled libraries 
+    don't interfere with system utilities. Accepts any standard 
+    subprocess.run arguments.
+    """
+    env = os.environ.copy()
+    # Remove PyInstaller's library path to use system-native libraries
+    env.pop("LD_LIBRARY_PATH", None)
+    
+    # Ensure 'env' is included in the final call
+    kwargs['env'] = env
+    
+    # Use the real subprocess module, not the function name itself
+    return subprocess.run(command, **kwargs)
+
+
 def get_all_interfaces():
     """Identifies all relevant hardware interfaces for the current OS."""
     system = platform.system()
@@ -75,45 +92,45 @@ def turn_on():
     if system == "Windows":
         for iface in ifaces:
             print(f"  [i] Securing interface: {iface}")
-            subprocess.run(
+            run_system_command(
                 f'netsh interface ipv4 set dns name="{iface}" source=static addr={IPV4_DNS[0]} primary',
                 shell=True,
                 capture_output=True
             )
-            subprocess.run(
+            run_system_command(
                 f'netsh interface ipv4 add dns name="{iface}" addr={IPV4_DNS[1]} index=2',
                 shell=True,
                 capture_output=True
             )
-            subprocess.run(
+            run_system_command(
                 f'netsh interface ipv6 set dns name="{iface}" source=static addr={IPV6_DNS[0]}',
                 shell=True,
             )
-            subprocess.run(
+            run_system_command(
                 f'netsh interface ipv6 add dns name="{iface}" addr={IPV6_DNS[1]} index=2',
                 shell=True,
             )
-        subprocess.run("ipconfig /flushdns", shell=True)
+        run_system_command("ipconfig /flushdns", shell=True)
 
     elif system == "Darwin":
         dns_str = " ".join(IPV4_DNS + IPV6_DNS)
         for iface in ifaces:
             print(f"  [i] Securing interface: {iface}")
-            subprocess.run(
+            run_system_command(
                 f'sudo networksetup -setdnsservers "{iface}" {dns_str}', shell=True
             )
-        subprocess.run("sudo killall -HUP mDNSResponder", shell=True)
+        run_system_command("sudo killall -HUP mDNSResponder", shell=True)
 
     elif system == "Linux":
         # 1. Update all existing connection profiles
         dns_v4 = ",".join(IPV4_DNS)
         dns_v6 = ",".join(IPV6_DNS)
         for iface in ifaces:
-            subprocess.run(
+            run_system_command(
                 f'nmcli connection modify "{iface}" ipv4.dns "{dns_v4}" ipv4.ignore-auto-dns yes',
                 shell=True,
             )
-            subprocess.run(
+            run_system_command(
                 f'nmcli connection modify "{iface}" ipv6.dns "{dns_v6}" ipv6.ignore-auto-dns yes',
                 shell=True,
             )
@@ -124,7 +141,7 @@ def turn_on():
         try:
             with open(config_path, "w") as f:
                 f.write(content)
-            subprocess.run("systemctl restart NetworkManager", shell=True)
+            run_system_command("systemctl restart NetworkManager", shell=True)
         except Exception as e:
             print(f"[!] Could not write global config: {e}")
 
@@ -138,27 +155,27 @@ def turn_off():
 
     if system == "Windows":
         for iface in ifaces:
-            subprocess.run(
+            run_system_command(
                 f'netsh interface ipv4 set dns name="{iface}" source=dhcp', shell=True
             )
-            subprocess.run(
+            run_system_command(
                 f'netsh interface ipv6 set dns name="{iface}" source=dhcp', shell=True
             )
 
     elif system == "Darwin":
         for iface in ifaces:
-            subprocess.run(
+            run_system_command(
                 f'sudo networksetup -setdnsservers "{iface}" empty', shell=True
             )
 
     elif system == "Linux":
         # 1. Revert profiles
         for iface in ifaces:
-            subprocess.run(
+            run_system_command(
                 f'nmcli connection modify "{iface}" ipv4.ignore-auto-dns no ipv6.ignore-auto-dns no',
                 shell=True,
             )
-            subprocess.run(
+            run_system_command(
                 f'nmcli connection modify "{iface}" ipv4.dns "" ipv6.dns ""', shell=True
             )
 
@@ -166,7 +183,7 @@ def turn_off():
         config_path = Path("/etc/NetworkManager/conf.d/dns-override.conf")
         if config_path.exists():
             config_path.unlink()
-            subprocess.run("systemctl restart NetworkManager", shell=True)
+            run_system_command("systemctl restart NetworkManager", shell=True)
 
     print("\n[+] Content filter status: OFF")
 
