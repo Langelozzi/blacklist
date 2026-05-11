@@ -1,29 +1,32 @@
 #!/bin/bash
 
-# 1. Define Paths
-INSTALL_SRC="$HOME/.config/blacklist"
-BIN_LINK="/usr/local/bin/blacklist"
-CONFIG_DIR="$HOME/.config/blacklist"
+INSTALL_DIR="$HOME/.local/share/blacklist"
+BIN_NAME="blacklist"
+SYMLINK_PATH="/usr/local/bin/$BIN_NAME"
+REPO="Langelozzi/blacklist"
 
-# 2. Create Folders
-mkdir -p "$INSTALL_SRC"
-mkdir -p "$CONFIG_DIR"
-
-# 3. Download Binary (Assume we are testing locally or repo is public)
-# Replace with your actual curl command
-echo "[+] Downloading binary to $INSTALL_SRC..."
-curl -L -o "$INSTALL_SRC/blacklist-bin" "https://github.com/Langelozzi/blacklist/releases/download/v0.1.0/blacklist-linux"
-chmod +x "$INSTALL_SRC/blacklist-bin"
-
-# 4. Download Blocklist to Config Folder
-echo "[+] Downloading blocklist to $CONFIG_DIR..."
-curl -L -o "$CONFIG_DIR/blocklist.txt" "https://raw.githubusercontent.com/Langelozzi/blacklist/main/lists/blocklist.txt"
-
-# 5. Create the Symlink (Requires Sudo for /usr/local/bin)
-echo "[+] Creating symlink..."
-if [ -L "$BIN_LINK" ]; then
-    sudo rm "$BIN_LINK"
+# Logic to match your YAML asset_name
+OS_TYPE=$(uname -s | tr '[:upper:]' '[:lower:]')
+if [ "$OS_TYPE" == "darwin" ]; then
+    SEARCH_PATTERN="blacklist-macos"
+else
+    SEARCH_PATTERN="blacklist-linux"
 fi
-sudo ln -s "$INSTALL_SRC/blacklist-bin" "$BIN_LINK"
 
-echo "[!] Done! Running 'blacklist' will now trigger the binary at $INSTALL_SRC."
+echo "[+] Searching for latest $SEARCH_PATTERN..."
+API_URL="https://api.github.com/repos/$REPO/releases/latest"
+DOWNLOAD_URL=$(curl -s $API_URL | grep "browser_download_url" | grep "$SEARCH_PATTERN" | cut -d '"' -f 4)
+
+if [ -z "$DOWNLOAD_URL" ]; then
+    echo "[-] Error: Asset $SEARCH_PATTERN not found in latest release."
+    exit 1
+fi
+
+mkdir -p "$INSTALL_DIR"
+curl -L -o "$INSTALL_DIR/$BIN_NAME" "$DOWNLOAD_URL"
+chmod +x "$INSTALL_DIR/$BIN_NAME"
+
+if [ -L "$SYMLINK_PATH" ] || [ -f "$SYMLINK_PATH" ]; then sudo rm "$SYMLINK_PATH"; fi
+sudo ln -s "$INSTALL_DIR/$BIN_NAME" "$SYMLINK_PATH"
+
+echo -e "\n[!] Done! Type 'sudo blacklist on' to begin."
