@@ -1,33 +1,37 @@
 # 1. Define Paths
 $ConfigDir = "$env:APPDATA\blacklist"
 $BinaryPath = "$ConfigDir\blacklist.exe"
+$Repo = "Langelozzi/blacklist"
 
-# URL - Ensure your release name matches the binary name in the folder
-$BinaryUrl = "https://github.com/Langelozzi/blacklist/releases/download/v0.1.0/blacklist-windows.exe"
+# 2. Get Latest Release URL from GitHub API
+Write-Host "[+] Checking GitHub for the latest version..." -ForegroundColor Cyan
+$ApiUrl = "https://api.github.com/repos/$Repo/releases/latest"
+$ReleaseInfo = Invoke-RestMethod -Uri $ApiUrl
 
-# 2. Create Folder
+# Filter assets for the Windows binary (adjust "-windows.exe" to match your actual filename)
+$DownloadUrl = $ReleaseInfo.assets | Where-Object { $_.name -like "*-windows.exe" } | Select-Object -ExpandProperty browser_download_url
+
+if (!$DownloadUrl) {
+    Write-Error "[!] Could not find a Windows binary in the latest GitHub release."
+    return
+}
+
+# 3. Create Folder
 if (!(Test-Path $ConfigDir)) {
     Write-Host "[+] Creating Directory: $ConfigDir" -ForegroundColor Cyan
     New-Item -ItemType Directory -Path $ConfigDir | Out-Null
 }
 
-# 3. Download Binary
-Write-Host "[+] Downloading binary to $BinaryPath..." -ForegroundColor Cyan
-Invoke-WebRequest -Uri $BinaryUrl -OutFile $BinaryPath
+# 4. Download Binary
+Write-Host "[+] Downloading latest version from: $DownloadUrl" -ForegroundColor Cyan
+Invoke-WebRequest -Uri $DownloadUrl -OutFile $BinaryPath
 
-# 4. Add to PATH (User Level)
-Write-Host "[+] Ensuring $ConfigDir is in your PATH..." -ForegroundColor Cyan
+# 5. Add to PATH
 $UserPath = [Environment]::GetEnvironmentVariable("Path", "User")
-
 if ($UserPath -notlike "*$ConfigDir*") {
-    $NewPath = "$UserPath;$ConfigDir"
-    [Environment]::SetEnvironmentVariable("Path", $NewPath, "User")
-    # Update current session PATH
+    [Environment]::SetEnvironmentVariable("Path", "$UserPath;$ConfigDir", "User")
     $env:Path += ";$ConfigDir"
-    Write-Host "[+] PATH updated successfully." -ForegroundColor Green
-} else {
-    Write-Host "[i] Directory already in PATH." -ForegroundColor Yellow
+    Write-Host "[+] PATH updated." -ForegroundColor Green
 }
 
-Write-Host "`n[!] Success! Restart your terminal and type 'blacklist' to begin." -ForegroundColor Green
-Write-Host "[i] Note: Admin privileges are required to toggle the DNS filter." -ForegroundColor Gray
+Write-Host "`n[!] Success! Restart your terminal to use 'blacklist'." -ForegroundColor Green
