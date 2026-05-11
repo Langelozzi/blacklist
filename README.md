@@ -43,3 +43,8 @@ blacklist --set-password
 ```bash
 blacklist --remove-password
 ```
+
+**Update blacklist:**
+```bash
+blacklist --update
+```
