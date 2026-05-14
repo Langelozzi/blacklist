@@ -9,8 +9,13 @@ from pathlib import Path
 from modules.password import remove_password, set_password, verify_password
 
 # Cloudflare for Families (Malware + Adult Content Filter)
-IPV4_DNS = ["1.1.1.3", "1.0.0.3"]
-IPV6_DNS = ["2606:4700:4700::1113", "2606:4700:4700::1003"]
+# -- This blocked all torrent sites and streaming sites too
+# IPV4_DNS = ["1.1.1.3", "1.0.0.3"]
+# IPV6_DNS = ["2606:4700:4700::1113", "2606:4700:4700::1003"]
+
+# CleanBrowsing (Adult Filter - Allows Streaming + Blocks Malware)
+IPV4_DNS = ["185.228.168.168", "185.228.169.168"]
+IPV6_DNS = ["2a0d:5600:33:1::", "2a0d:5601:33:1::"]
 
 
 def is_running_as_root():
