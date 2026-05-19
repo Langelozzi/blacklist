@@ -4,6 +4,7 @@ import platform
 import subprocess
 import argparse
 import ctypes
+import socket
 from pathlib import Path
 
 from modules.password import remove_password, set_password, verify_password
@@ -16,6 +17,10 @@ from modules.password import remove_password, set_password, verify_password
 # CleanBrowsing (Adult Filter - Allows Streaming + Blocks Malware)
 IPV4_DNS = ["185.228.168.168", "185.228.169.168"]
 IPV6_DNS = ["2a0d:5600:33:1::", "2a0d:5601:33:1::"]
+
+# Hosts file for allowing select urls
+WINDOWS_HOST_FILE = r"C:\Windows\System32\drivers\etc\hosts"
+UNIX_HOST_FILE = "/etc/hosts"
 
 
 def is_running_as_root():
@@ -213,13 +218,218 @@ def turn_off():
     print("\n[+] Content filter status: OFF")
 
 
+def allow_domains(targets):
+    """
+    Temporarily disables the filter, resolves the specified domains (and their www variants),
+    maps them in the hosts file, and re-enables the filter.
+    """
+    if not targets:
+        print("[-] Error: Please specify at least one domain or a file path.")
+        return
+
+    domains_to_resolve = set()
+
+    # 1. Parse targets (distinguish between files and raw domains)
+    for target in targets:
+        path = Path(target)
+        if path.is_file():
+            try:
+                with open(path, "r") as f:
+                    for line in f:
+                        cleaned = line.strip()
+                        if cleaned and not cleaned.startswith("#"):
+                            domains_to_resolve.add(cleaned)
+            except Exception as e:
+                print(f"[-] Failed to read file {target}: {e}")
+        else:
+            domains_to_resolve.add(target.strip())
+
+    # 2. Automatically inject 'www.' variants if missing
+    final_domains = set()
+    for domain in domains_to_resolve:
+        final_domains.add(domain)
+        if not domain.startswith("www.") and len(domain.split(".")) == 2:
+            final_domains.add(f"www.{domain}")
+
+    if not final_domains:
+        print("[-] No valid domains found to process.")
+        return
+
+    # 3. Drop filter temporarily to communicate with clear DNS upstream
+    print("[+] Dropping filter temporarily to accurately resolve mappings...")
+    turn_off()
+
+    resolved_mappings = {}
+    print("[+] Resolving domain IPs...")
+    for domain in final_domains:
+        try:
+            # gethostbyname_ex returns (hostname, aliaslist, ipaddrlist)
+            _, _, ip_list = socket.gethostbyname_ex(domain)
+            if ip_list:
+                resolved_mappings[domain] = ip_list
+                print(f"  [i] {domain} -> {', '.join(ip_list)}")
+        except socket.gaierror:
+            print(
+                f"  [!] Failed to resolve: {domain} (Check domain syntax or connection)"
+            )
+
+    # Re-enable the filter immediately after resolving
+    turn_on()
+
+    if not resolved_mappings:
+        print("[-] No domains were successfully resolved. Hosts file left untouched.")
+        return
+
+    # 4. Safely update the host configuration file
+    hosts_path = WINDOWS_HOST_FILE if platform.system() == "Windows" else UNIX_HOST_FILE
+
+    try:
+        # Read current hosts to prevent block corruption or duplicates
+        existing_lines = []
+        if Path(hosts_path).exists():
+            with open(hosts_path, "r") as f:
+                existing_lines = f.readlines()
+
+        # Clean existing entries matching our current additions to avoid clutter
+        cleaned_lines = [
+            line
+            for line in existing_lines
+            if not any(f" {domain}" in line for domain in resolved_mappings)
+        ]
+
+        # Append new resolved blocks
+        with open(hosts_path, "w") as f:
+            f.writelines(cleaned_lines)
+            f.write("\n# --- Blacklist Custom Allow List Start ---\n")
+            for domain, ips in resolved_mappings.items():
+                for ip in ips:
+                    f.write(f"{ip:<16} {domain} # Blacklist-Allow\n")
+            f.write("# --- Blacklist Custom Allow List End ---\n")
+
+        print(f"\n[+] Successfully injected entries into {hosts_path}")
+
+        # Flush the system DNS cache to apply rules immediately
+        if platform.system() == "Windows":
+            run_system_command("ipconfig /flushdns", shell=True)
+        elif platform.system() == "Darwin":
+            run_system_command("sudo killall -HUP mDNSResponder", shell=True)
+
+    except PermissionError:
+        print(
+            f"[-] Permission denied writing to {hosts_path}. Ensure the script is run with sudo/Administrator privileges."
+        )
+    except Exception as e:
+        print(f"[-] Failed modifications: {e}")
+
+
+def disallow_domains(targets):
+    """
+    Removes specific domains (and their www variants) from the hosts file override.
+    If no targets are passed, it clears out ALL custom overrides.
+    """
+    hosts_path = WINDOWS_HOST_FILE if platform.system() == "Windows" else UNIX_HOST_FILE
+
+    if not Path(hosts_path).exists():
+        print("[-] Hosts file not found.")
+        return
+
+    domains_to_remove = set()
+
+    # 1. Parse targets if provided
+    for target in targets:
+        path = Path(target)
+        if path.is_file():
+            try:
+                with open(path, "r") as f:
+                    for line in f:
+                        cleaned = line.strip()
+                        if cleaned and not cleaned.startswith("#"):
+                            domains_to_remove.add(cleaned)
+            except Exception as e:
+                print(f"[-] Failed to read file {target}: {e}")
+        else:
+            domains_to_remove.add(target.strip())
+
+    # 2. Re-create the matching www. variants to ensure complete cleanup
+    final_removal_set = set()
+    for domain in domains_to_remove:
+        final_removal_set.add(domain)
+        if not domain.startswith("www.") and len(domain.split(".")) == 2:
+            final_removal_set.add(f"www.{domain}")
+
+    try:
+        with open(hosts_path, "r") as f:
+            lines = f.readlines()
+
+        cleaned_lines = []
+        removed_count = 0
+
+        # 3. Filter out lines
+        for line in lines:
+            # If the user specified explicit domains to target
+            if final_removal_set:
+                if "# Blacklist-Allow" in line and any(
+                    f" {dom}" in line for dom in final_removal_set
+                ):
+                    removed_count += 1
+                    continue  # Skip this line (removes it)
+            else:
+                # Nuke EVERYTHING added by this tool if they just run `blacklist disallow`
+                if (
+                    "# Blacklist-Allow" in line
+                    or "--- Blacklist Custom Allow List" in line
+                ):
+                    removed_count += 1
+                    continue
+
+            cleaned_lines += [line]
+
+        # 4. Clean up dangling header/footer blocks if the list is completely empty now
+        if not any("# Blacklist-Allow" in line for line in cleaned_lines):
+            cleaned_lines = [
+                line
+                for line in cleaned_lines
+                if "--- Blacklist Custom Allow List" not in line
+            ]
+
+        # 5. Write changes back
+        with open(hosts_path, "w") as f:
+            f.writelines(cleaned_lines)
+
+        if final_removal_set:
+            print(f"[+] Removed {removed_count} mapping entries for specified domains.")
+        else:
+            print("[+] Flushed all custom domain allocations from the hosts file.")
+
+        # Flush cache so it applies instantly
+        if platform.system() == "Windows":
+            run_system_command("ipconfig /flushdns", shell=True)
+        elif platform.system() == "Darwin":
+            run_system_command("sudo killall -HUP mDNSResponder", shell=True)
+
+    except PermissionError:
+        print(
+            f"[-] Permission denied writing to {hosts_path}. Run with sudo/Administrator privileges."
+        )
+    except Exception as e:
+        print(f"[-] Modification failed: {e}")
+
+
 def parse_args(parser):
     parser.add_argument(
-        "state",
+        "cmd",
         nargs="?",
-        choices=["on", "off"],
+        choices=["on", "off", "allow", "disallow"],
         default=None,
-        help="Turn the blacklist 'on' (enable) or 'off' (disable/revert)",
+        help="Turn the blacklist 'on', 'off', or 'allow', 'disallow' explicit domains",
+    )
+
+    # Collects 0 or more domain names or file paths following the command
+    parser.add_argument(
+        "targets",
+        nargs="*",
+        default=[],
+        help="List of domains or path to a file containing domains to allow or disallow",
     )
 
     parser.add_argument(
@@ -255,20 +465,28 @@ def main():
         update_tool()
         return
 
-    if args.state is None:
+    if args.cmd is None:
         parser.print_help()
         return
 
     try:
+        # Enforce administrative access for active mutations
         assert_root_user()
+
+        # Don't need password to turn on
+        if args.cmd == "on":
+            turn_on()
+            return
 
         if not verify_password():
             return
 
-        if args.state == "on":
-            turn_on()
-        elif args.state == "off":
+        if args.cmd == "off":
             turn_off()
+        elif args.cmd == "allow":
+            allow_domains(args.targets)
+        elif args.cmd == "disallow":
+            disallow_domains(args.targets)
 
     except PermissionError:
         print("[-] Error: Insufficient permissions. Run as Admin/Sudo.")
