@@ -9,6 +9,17 @@ from pathlib import Path
 
 from modules.password import remove_password, set_password, verify_password
 
+
+def get_version():
+    """Read version from VERSION file."""
+    try:
+        version_file = Path(__file__).parent / "VERSION"
+        with open(version_file, "r") as f:
+            return f.read().strip()
+    except Exception:
+        return "unknown"
+
+
 # Cloudflare for Families (Malware + Adult Content Filter)
 # -- This blocked all torrent sites and streaming sites too
 # IPV4_DNS = ["1.1.1.3", "1.0.0.3"]
@@ -416,6 +427,12 @@ def disallow_domains(targets):
 
 
 def parse_args(parser):
+    parser.add_argument(
+        "-v", "--version",
+        action="version",
+        version=f"blacklist {get_version()}"
+    )
+
     parser.add_argument(
         "cmd",
         nargs="?",
