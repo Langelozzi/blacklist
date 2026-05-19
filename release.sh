@@ -1,10 +1,17 @@
 #!/bin/bash
 
-# Release script: reads VERSION file, creates git tag, and pushes to GitHub
+# Release script: commits VERSION file, creates git tag, and pushes to GitHub
 
 VERSION=$(cat VERSION)
 
 echo "[+] Creating release for version v$VERSION..."
+
+# Commit VERSION file changes
+git add VERSION
+git commit -m "Release v$VERSION"
+
+# Push commits to GitHub
+git push origin main
 
 # Create annotated git tag
 git tag -a "v$VERSION" -m "Release v$VERSION"
